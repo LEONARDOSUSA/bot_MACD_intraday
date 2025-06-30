@@ -1,0 +1,6 @@
+alpaca-trade-api==2.3.0
+pandas==1.5.3
+numpy==1.24.4
+ta==0.10.2
+pytz==2023.3
+requests==2.31.0
