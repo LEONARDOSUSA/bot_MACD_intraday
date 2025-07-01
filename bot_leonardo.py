@@ -114,7 +114,6 @@ def run():
                 print(f"⚠️ Error con {ticker}: {e}", flush=True)
 
         time.sleep(60)
-
 if __name__ == "__main__":
 enviar_mensaje("🧪 Test de conexión: el bot puede comunicarse con Telegram.")
-     run()  
+run()  
