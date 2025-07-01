@@ -65,7 +65,7 @@ def run():
 
     fecha_hoy = datetime.now(NY_TZ).date()
     niveles = {}
-
+    enviados = set()
     print(f"📍 Esperando cierre de vela 15M...", flush=True)
     while datetime.now(NY_TZ).time() < datetime.strptime("09:46", "%H:%M").time():
         time.sleep(10)
@@ -111,6 +111,7 @@ def run():
                     )
                     print(f"✅ {señal}", flush=True)
                     enviar_mensaje(señal)
+                    enviados.add(ticker)
                     activos_vivos.remove(ticker)
                 else:
                     print(f"· MACD no alineado para {ticker}", flush=True)
