@@ -116,4 +116,6 @@ def run():
         time.sleep(60)
 
 if __name__ == "__main__":
-    run()
+enviar_mensaje("🧪 Test de conexión: el bot puede comunicarse con Telegram.")
+     run()  ← lo dejás comentado por ahora, solo para esta prueba 
+
