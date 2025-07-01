@@ -57,7 +57,7 @@ def confirmar_macd(ticker, momento, direccion):
     return True
 
 # 🔁 Loop principal
- def run():
+def run():
     fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d")
     enviar_mensaje(
         f"🟢 Bot iniciado correctamente el {fecha_actual}. Escaneando señales desde 09:46 hasta 14:00..."
@@ -74,8 +74,8 @@ def confirmar_macd(ticker, momento, direccion):
         niveles[ticker] = obtener_nivel_15m(ticker, fecha_hoy)
 
     activos_vivos = tickers_activos[:]
-
     print("🔁 Comenzando escaneo minuto a minuto\n", flush=True)
+
     while activos_vivos and datetime.now(NY_TZ).time() < datetime.strptime("14:00", "%H:%M").time():
         for ticker in activos_vivos[:]:
             try:
@@ -119,5 +119,13 @@ def confirmar_macd(ticker, momento, direccion):
                 print(f"⚠️ Error con {ticker}: {e}", flush=True)
 
         time.sleep(60)
+
 if __name__ == "__main__":
-    run()  
+    run()
+
+
+
+   
+              
+                  
+     
