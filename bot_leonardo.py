@@ -41,7 +41,8 @@ def confirmar_macd(ticker, momento, direccion):
         inicio = momento - timedelta(minutes=100)
         df = api.get_bars(ticker, tf, start=inicio.isoformat(), end=momento.isoformat()).df
         df = df.tz_convert("America/New_York")
-        if len(df) < 35: return False
+        if len(df) < 35:
+            return False
 
         macd = ta.trend.MACD(df["close"])
         df["macd"], df["signal"] = macd.macd(), macd.macd_signal()
@@ -94,16 +95,17 @@ def run():
 
                 print(f"📊 {ticker} ➝ patrón {direccion} detectado — {momento.strftime('%H:%M')}", flush=True)
 
-               precio = round(c2, 2)  # c2 es el cierre de la segunda vela de 1M
-hora = momento.strftime("%H:%M")
-señal = (
-    f"📈 Estrategia: Breakout Triple MACD\n"
-    f"📊 Ticker: {ticker}\n"
-    f"📌 Señal: {direccion} a las {hora}\n"
-    f"💵 Precio: ${precio}"
-)
-print(f"✅ {señal}", flush=True)
-enviar_mensaje(señal)
+                if confirmar_macd(ticker, momento, direccion):
+                    precio = round(c2, 2)
+                    hora = momento.strftime("%H:%M")
+                    señal = (
+                        f"📈 Estrategia: Breakout Triple MACD\n"
+                        f"📊 Ticker: {ticker}\n"
+                        f"📌 Señal: {direccion} a las {hora}\n"
+                        f"💵 Precio: ${precio}"
+                    )
+                    print(f"✅ {señal}", flush=True)
+                    enviar_mensaje(señal)
                     activos_vivos.remove(ticker)
                 else:
                     print(f"· MACD no alineado para {ticker}", flush=True)
