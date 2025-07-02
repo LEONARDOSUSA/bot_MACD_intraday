@@ -2,6 +2,7 @@ import os
 import time
 import requests
 from datetime import datetime, timedelta
+from validadores import verificar_claves_y_datos
 import pandas as pd
 import alpaca_trade_api as tradeapi
 import pytz
@@ -25,7 +26,8 @@ def enviar_mensaje(mensaje):
 
 # 🧱 Obtener nivel de referencia de vela 15M (9:30–9:45)
 def obtener_nivel_15m(ticker, fecha_base):
-    inicio = NY_TZ.localize(datetime.combine(fecha_base, datetime.strptime("09:30", "%H:%M").time()))
+    inicio = datetime.combine(fecha_base, datetime.strptime("09:30", "%H:%M").time())
+    inicio = NY_TZ.localize(inicio)
     fin = inicio + timedelta(minutes=15)
     df = api.get_bars(ticker, "15Min", start=inicio.isoformat(), end=fin.isoformat()).df
     df = df.tz_convert("America/New_York")
@@ -39,6 +41,8 @@ def confirmar_macd(ticker, momento, direccion):
     timeframes = ["1Min", "5Min", "15Min"]
     for tf in timeframes:
         inicio = momento - timedelta(minutes=100)
+        inicio = NY_TZ.localize(inicio.replace(tzinfo=None))
+        momento = NY_TZ.localize(momento.replace(tzinfo=None))
         df = api.get_bars(ticker, tf, start=inicio.isoformat(), end=momento.isoformat()).df
         df = df.tz_convert("America/New_York")
         if len(df) < 35:
@@ -58,12 +62,11 @@ def confirmar_macd(ticker, momento, direccion):
 
 # 🔁 Loop principal
 def run():
-   # fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d")
-   # enviar_mensaje(
-       # f"🟢 Bot iniciado correctamente el {fecha_actual}. Escaneando señales desde 09:46 hasta 14:00..."
-   # )
-
-    fecha_hoy = datetime.now(NY_TZ).date()
+ fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d")
+   enviar_mensaje(
+        f"🟢 Bot iniciado correctamente el {fecha_actual}. Escaneando señales desde 09:46 hasta 14:00..."
+    )
+     fecha_hoy = datetime.now(NY_TZ).date()
     niveles = {}
     enviados = set()
     print(f"📍 Esperando cierre de vela 15M...", flush=True)
@@ -81,6 +84,7 @@ def run():
             try:
                 fin = datetime.now(NY_TZ)
                 inicio = fin - timedelta(minutes=3)
+                inicio = NY_TZ.localize(inicio.replace(tzinfo=None))
                 df = api.get_bars(ticker, "1Min", start=inicio.isoformat(), end=fin.isoformat()).df
                 df = df.tz_convert("America/New_York")
                 if len(df) < 3:
@@ -122,6 +126,10 @@ def run():
         time.sleep(60)
 
 if __name__ == "__main__":
+    print("🔐 Validando entorno Alpaca...")
+    if not verificar_claves_y_datos(ALPACA_KEY, ALPACA_SECRET):
+        print("⛔ No se pudo iniciar el bot. Revisá claves o suscripción de datos.")
+        exit()
     run()
 
 
