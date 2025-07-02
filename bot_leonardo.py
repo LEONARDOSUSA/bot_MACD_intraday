@@ -63,7 +63,7 @@ def confirmar_macd(ticker, momento, direccion):
 # 🔁 Loop principal
 def run():
     fecha_hoy = datetime.now(NY_TZ).date()
-    fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d %H:%M")
+   # fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d %H:%M")
    # enviar_mensaje(f"✅ Bot operativo. Verificación OK el {fecha_actual}. Escaneando desde 09:46.")
 
     niveles = {}
