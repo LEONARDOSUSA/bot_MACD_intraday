@@ -62,8 +62,8 @@ def confirmar_macd(ticker, momento, direccion):
 
 # 🔁 Loop principal
 def run():
- fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d")
-   enviar_mensaje(f"🟢 Bot iniciado correctamente el {fecha_actual}. Escaneando señales desde 09:46 hasta 14:00...")
+ #fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d")
+   #enviar_mensaje(f"🟢 Bot iniciado correctamente el {fecha_actual}. Escaneando señales desde 09:46 hasta 14:00...")
      fecha_hoy = datetime.now(NY_TZ).date()
     niveles = {}
     enviados = set()
