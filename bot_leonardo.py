@@ -135,8 +135,16 @@ if __name__ == "__main__":
     if not verificar_claves_y_datos(ALPACA_KEY, ALPACA_SECRET):
         print("⛔ No se pudo iniciar el bot. Revisá claves o suscripción de datos.")
         exit()
-    run()
 
+    hora_actual = datetime.now(NY_TZ).time()
+    hora_inicio = datetime.strptime("09:25", "%H:%M").time()
+    hora_fin = datetime.strptime("09:46", "%H:%M").time()
+
+    if hora_inicio <= hora_actual <= hora_fin:
+        print("✅ Sistema activo — Ejecutando con lógica, no con suerte")
+        run()
+    else:
+        print(f"⏳ Bot iniciado fuera de ventana operativa ({hora_actual.strftime('%H:%M')}) — No se ejecutará la estrategia.")
 
    
               
