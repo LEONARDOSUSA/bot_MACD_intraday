@@ -23,23 +23,34 @@ def enviar_mensaje(mensaje):
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje}
     requests.post(url, data=data)
 
-# 🧱 Obtener nivel de referencia (cierre 15Min entre 09:30–09:45)
+# 🧱 Nivel + dirección institucional
 def obtener_nivel_15m(ticker, fecha_base):
     inicio = datetime.combine(fecha_base, datetime.strptime("09:30", "%H:%M").time())
-    inicio = NY_TZ.localize(inicio)
     fin = inicio + timedelta(minutes=15)
+    inicio = NY_TZ.localize(inicio)
+    fin = NY_TZ.localize(fin)
     df = api.get_bars(ticker, "15Min", start=inicio.isoformat(), end=fin.isoformat()).df
     df = df.tz_convert("America/New_York")
     if df.empty:
         print(f"⛔ Sin vela 15Min para {ticker}")
-        return None
-    return df.iloc[0]["close"]
+        return None, None
 
-# 📊 Confirmar condición técnica MACD sin cruce + tolerancia
+    vela = df.iloc[0]
+    close = vela["close"]
+    open_ = vela["open"]
+    if close > open_:
+        direccion = "CALL"
+    elif close < open_:
+        direccion = "PUT"
+    else:
+        direccion = None
+
+    return round(close, 2), direccion
+
+# 📊 Confirmación técnica MACD
 def confirmar_macd(ticker, momento, direccion):
     timeframes = ["1Min", "5Min", "15Min"]
     confirmados = 0
-
     for tf in timeframes:
         try:
             inicio = momento - timedelta(minutes=600)
@@ -47,16 +58,13 @@ def confirmar_macd(ticker, momento, direccion):
             fin = NY_TZ.localize(momento.replace(tzinfo=None))
             df = api.get_bars(ticker, tf, start=inicio.isoformat(), end=fin.isoformat()).df
             df = df.tz_convert("America/New_York").dropna().copy()
-
             if len(df) < 35:
                 print(f"· {tf}: ❌ Datos insuficientes — marco excluido")
                 continue
-
             macd = ta.trend.MACD(df["close"])
             df["macd"], df["signal"] = macd.macd(), macd.macd_signal()
             df = df.dropna()
             m1, s1 = df["macd"].iloc[-1], df["signal"].iloc[-1]
-
             if direccion == "CALL" and m1 > s1:
                 confirmados += 1
                 print(f"· {tf}: ✅ MACD alineado (CALL)")
@@ -67,20 +75,25 @@ def confirmar_macd(ticker, momento, direccion):
                 print(f"· {tf}: ❌ MACD no alineado")
         except Exception as e:
             print(f"· {tf}: ⚠️ Error técnico → {e}")
-
     return confirmados >= 2
 
 # 🔁 Loop principal
 def run():
     fecha_hoy = datetime.now(NY_TZ).date()
     niveles = {}
+    direcciones_inst = {}
     enviados = set()
     print(f"📍 Esperando cierre de vela 15Min...", flush=True)
     while datetime.now(NY_TZ).time() < datetime.strptime("09:46", "%H:%M").time():
         time.sleep(10)
 
     for ticker in tickers_activos:
-        niveles[ticker] = obtener_nivel_15m(ticker, fecha_hoy)
+        nivel, direccion_inst = obtener_nivel_15m(ticker, fecha_hoy)
+        if nivel is not None and direccion_inst is not None:
+            niveles[ticker] = nivel
+            direcciones_inst[ticker] = direccion_inst
+        else:
+            print(f"· {ticker} excluido por falta de dirección institucional")
 
     activos_vivos = tickers_activos[:]
     print("\n🔁 Comenzando escaneo minuto a minuto\n", flush=True)
@@ -100,10 +113,11 @@ def run():
                 c2 = df["close"].iloc[-2]
                 momento = df.index[-2].to_pydatetime()
                 nivel = niveles[ticker]
+                direccion_inst = direcciones_inst.get(ticker)
 
-                if c1 > nivel and c2 > nivel:
+                if direccion_inst == "CALL" and c1 > nivel and c2 > nivel:
                     direccion = "CALL"
-                elif c1 < nivel and c2 < nivel:
+                elif direccion_inst == "PUT" and c1 < nivel and c2 < nivel:
                     direccion = "PUT"
                 else:
                     continue
@@ -124,10 +138,8 @@ def run():
                     activos_vivos.remove(ticker)
                 else:
                     print("· Señal descartada — MACD insuficiente\n", flush=True)
-
             except Exception as e:
                 print(f"⚠️ Error con {ticker}: {e}", flush=True)
-
         time.sleep(60)
 
 if __name__ == "__main__":
@@ -144,9 +156,6 @@ if __name__ == "__main__":
         print("✅ Sistema activo — Ejecutando con lógica, no con suerte")
         run()
     else:
-        print(f"⏳ Bot iniciado fuera de ventana operativa ({hora_actual.strftime('%H:%M')}) — No se ejecutará la estrategia.")
-
-   
-              
+        print(f"⏳ Bot iniciado fuera de ventana operativa ({hora_actual.strftime('%H:%M')}) — No se ejecutará la estrategia.")            
                   
      
