@@ -3,7 +3,6 @@ import time
 import requests
 from datetime import datetime, timedelta
 from validadores import verificar_claves_y_datos
-import pandas as pd
 import alpaca_trade_api as tradeapi
 import pytz
 import ta
@@ -24,7 +23,7 @@ def enviar_mensaje(mensaje):
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": mensaje}
     requests.post(url, data=data)
 
-# 🧱 Obtener nivel de referencia de vela 15M (9:30–9:45)
+# 🧱 Obtener nivel de referencia (cierre 15Min entre 09:30–09:45)
 def obtener_nivel_15m(ticker, fecha_base):
     inicio = datetime.combine(fecha_base, datetime.strptime("09:30", "%H:%M").time())
     inicio = NY_TZ.localize(inicio)
@@ -32,43 +31,51 @@ def obtener_nivel_15m(ticker, fecha_base):
     df = api.get_bars(ticker, "15Min", start=inicio.isoformat(), end=fin.isoformat()).df
     df = df.tz_convert("America/New_York")
     if df.empty:
-        print(f"⛔ Sin vela 15M para {ticker}")
+        print(f"⛔ Sin vela 15Min para {ticker}")
         return None
     return df.iloc[0]["close"]
 
-# 🧠 Confirmar alineación MACD
+# 📊 Confirmar condición técnica MACD sin cruce + tolerancia
 def confirmar_macd(ticker, momento, direccion):
     timeframes = ["1Min", "5Min", "15Min"]
+    confirmados = 0
+
     for tf in timeframes:
-        inicio = momento - timedelta(minutes=100)
-        inicio = NY_TZ.localize(inicio.replace(tzinfo=None))
-        momento = NY_TZ.localize(momento.replace(tzinfo=None))
-        df = api.get_bars(ticker, tf, start=inicio.isoformat(), end=momento.isoformat()).df
-        df = df.tz_convert("America/New_York")
-        if len(df) < 35:
-            return False
+        try:
+            inicio = momento - timedelta(minutes=600)
+            inicio = NY_TZ.localize(inicio.replace(tzinfo=None))
+            fin = NY_TZ.localize(momento.replace(tzinfo=None))
+            df = api.get_bars(ticker, tf, start=inicio.isoformat(), end=fin.isoformat()).df
+            df = df.tz_convert("America/New_York").dropna().copy()
 
-        macd = ta.trend.MACD(df["close"])
-        df["macd"], df["signal"] = macd.macd(), macd.macd_signal()
+            if len(df) < 35:
+                print(f"· {tf}: ❌ Datos insuficientes — marco excluido")
+                continue
 
-        m0, m1 = df["macd"].iloc[-2], df["macd"].iloc[-1]
-        s0, s1 = df["signal"].iloc[-2], df["signal"].iloc[-1]
+            macd = ta.trend.MACD(df["close"])
+            df["macd"], df["signal"] = macd.macd(), macd.macd_signal()
+            df = df.dropna()
+            m1, s1 = df["macd"].iloc[-1], df["signal"].iloc[-1]
 
-        if direccion == "CALL" and not (m0 < s0 and m1 > s1):
-            return False
-        if direccion == "PUT" and not (m0 > s0 and m1 < s1):
-            return False
-    return True
+            if direccion == "CALL" and m1 > s1:
+                confirmados += 1
+                print(f"· {tf}: ✅ MACD alineado (CALL)")
+            elif direccion == "PUT" and m1 < s1:
+                confirmados += 1
+                print(f"· {tf}: ✅ MACD alineado (PUT)")
+            else:
+                print(f"· {tf}: ❌ MACD no alineado")
+        except Exception as e:
+            print(f"· {tf}: ⚠️ Error técnico → {e}")
+
+    return confirmados >= 2
 
 # 🔁 Loop principal
 def run():
     fecha_hoy = datetime.now(NY_TZ).date()
-   # fecha_actual = datetime.now(NY_TZ).strftime("%Y-%m-%d %H:%M")
-   # enviar_mensaje(f"✅ Bot operativo. Verificación OK el {fecha_actual}. Escaneando desde 09:46.")
-
     niveles = {}
     enviados = set()
-    print(f"📍 Esperando cierre de vela 15M...", flush=True)
+    print(f"📍 Esperando cierre de vela 15Min...", flush=True)
     while datetime.now(NY_TZ).time() < datetime.strptime("09:46", "%H:%M").time():
         time.sleep(10)
 
@@ -76,7 +83,7 @@ def run():
         niveles[ticker] = obtener_nivel_15m(ticker, fecha_hoy)
 
     activos_vivos = tickers_activos[:]
-    print("🔁 Comenzando escaneo minuto a minuto\n", flush=True)
+    print("\n🔁 Comenzando escaneo minuto a minuto\n", flush=True)
 
     while activos_vivos and datetime.now(NY_TZ).time() < datetime.strptime("14:00", "%H:%M").time():
         for ticker in activos_vivos[:]:
@@ -101,8 +108,7 @@ def run():
                 else:
                     continue
 
-                print(f"📊 {ticker} ➝ patrón {direccion} detectado — {momento.strftime('%H:%M')}", flush=True)
-
+                print(f"\n📊 {ticker} ➝ patrón {direccion} detectado — {momento.strftime('%H:%M')}", flush=True)
                 if confirmar_macd(ticker, momento, direccion):
                     precio = round(c2, 2)
                     hora = momento.strftime("%H:%M")
@@ -112,12 +118,12 @@ def run():
                         f"📌 Señal: {direccion} a las {hora}\n"
                         f"💵 Precio: ${precio}"
                     )
-                    print(f"✅ {señal}", flush=True)
+                    print("✅ Señal disparada\n", flush=True)
                     enviar_mensaje(señal)
                     enviados.add(ticker)
                     activos_vivos.remove(ticker)
                 else:
-                    print(f"· MACD no alineado para {ticker}", flush=True)
+                    print("· Señal descartada — MACD insuficiente\n", flush=True)
 
             except Exception as e:
                 print(f"⚠️ Error con {ticker}: {e}", flush=True)
